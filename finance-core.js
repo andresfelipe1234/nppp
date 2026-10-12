@@ -1,0 +1,12 @@
+// Lógica financiera pura compartida por la app y las pruebas de Node.
+(function(root){
+ const KEY='brujula-v1';
+ function addTransaction(state,{type,amount,category,note='',date=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Bogota',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date())}){const value=Number(amount);if(!['income','expense'].includes(type)||!Number.isFinite(value)||value<=0)throw Error('Ingresa un valor válido.');const t={id:crypto.randomUUID(),type,amount:value,category,note,date};state.transactions.unshift(t);return t}
+ function totals(state){return state.transactions.reduce((a,t)=>(a[t.type]+=Number(t.amount),a),{income:0,expense:0})}
+ function addContribution(state,id,amount){const goal=state.goals.find(g=>g.id===id);const value=Number(amount);if(!goal||!Number.isFinite(value)||value<=0)throw Error('Aporte no válido.');goal.saved=Math.min(goal.target,Number(goal.saved)+value);return goal}
+ function recordUber(state,{date,cash=0,transfer=0,app=0,deliveries=0,note=''}){const values=[cash,transfer,app].map(Number),count=Number(deliveries)||0;if(!date||values.some(v=>!Number.isFinite(v)||v<0)||values.every(v=>v===0)||!Number.isFinite(count)||count<0)throw Error('Registra un monto positivo y datos válidos.');const entry={id:crypto.randomUUID(),date,cash:values[0],transfer:values[1],app:values[2],deliveries:count,note};(state.uberEntries||(state.uberEntries=[])).push(entry);return entry}
+ function uberRevenue(entries,start,end,method=null){return entries.filter(x=>x.date>=start&&x.date<=end).reduce((sum,x)=>sum+(method?Number(x[method])||0:['cash','transfer','app'].reduce((s,k)=>s+(Number(x[k])||0),0)),0)}
+ function uberIncomeTransactions(entries){return entries.flatMap(x=>['cash','transfer','app'].filter(k=>Number(x[k])>0).map(k=>({id:`uber-${x.id}-${k}`,type:'income',amount:Number(x[k]),category:`Uber · ${k==='cash'?'efectivo':k==='transfer'?'transferencia':'app'}`,note:`Turno Uber · ${x.deliveries||0} entregas`,date:x.date,source:'uber'})))}
+ function consecutiveStreak(dates,today){const done=new Set(dates);let cursor=new Date(`${today}T12:00:00Z`);if(!done.has(today))cursor.setUTCDate(cursor.getUTCDate()-1);let count=0;while(done.has(cursor.toISOString().slice(0,10))){count++;cursor.setUTCDate(cursor.getUTCDate()-1)}return count}
+ const api={KEY,addTransaction,totals,addContribution,recordUber,uberRevenue,uberIncomeTransactions,consecutiveStreak};if(typeof module!=='undefined'&&module.exports)module.exports=api;root.BrujulaCore=api;
+})(typeof window!=='undefined'?window:globalThis);
